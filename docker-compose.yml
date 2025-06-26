@@ -1,0 +1,63 @@
+
+#####################################################################################################################################################
+
+
+
+#####################################################################################################################################################
+networks:
+  guacnetwork_compose:
+    driver: bridge
+
+# services
+services:
+  # guacd
+  guacd:
+    container_name: guacd
+    image: guacamole/guacd
+    networks:
+      - guacnetwork_compose
+    restart: always
+  # postgres
+  mariadb:
+    container_name: mariadb
+    environment:
+      MYSQL_ROOT_PASSWORD: 'your_password'
+      MYSQL_DATABASE: 'guacamole_db'
+      MYSQL_USERNAME: 'guacamole_user'
+      MYSQL_PASSWORD: 'some_password'
+    image: mariadb:10.6
+    networks:
+      - guacnetwork_compose
+    restart: always
+    volumes:
+    - "initdb:/docker-entrypoint-initdb.d:ro"
+
+  # guacamole
+  guacamole:
+    container_name: guacamole
+    group_add:
+      - "1000"
+    depends_on:
+    - guacd
+    - mariadb
+    links:
+      - guacd
+      - mariadb
+    environment:
+      MYSQL_ENABLED: "true"
+      GUACD_HOSTNAME: guacd
+      MYSQL_HOSTNAME: 'mariadb'
+      MYSQL_DATABASE: 'guacamole_db'
+      MYSQL_USERNAME: 'root' # if you want to use custom user, you will have to create a user in mariadb beforehand.
+      MYSQL_PASSWORD: 'your_password'
+    image: guacamole/guacamole
+    networks:
+      - guacnetwork_compose
+    volumes:
+      - "initdb:/opt/guacamole/extensions/guacamole-auth-jdbc/mysql/schema:ro"
+    ports:
+    - 8080:8080/tcp
+    restart: always
+
+volumes:
+  initdb:

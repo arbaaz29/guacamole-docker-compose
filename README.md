@@ -13,13 +13,13 @@ You need a working **docker** installation and **docker compose** running on you
 Clone the GIT repository and start guacamole:
 
 ~~~bash
-git clone "https://github.com/boschkundendienst/guacamole-docker-compose.git"
+git clone "https://github.com/arbaaz29/guacamole-docker-compose.git"
 cd guacamole-docker-compose
 ./prepare.sh
 docker compose up -d
 ~~~
 
-Your guacamole server should now be available at `https://ip of your server:8443/`. The default username is `guacadmin` with password `guacadmin`.
+Your guacamole server should now be available at `https://ip of your server:8080/`. The default username is `guacadmin` with password `guacadmin`.
 
 ## Details
 To understand some details let's take a closer look at parts of the `docker-compose.yml` file:
@@ -38,7 +38,7 @@ networks:
 
 ### Services
 #### guacd
-The following part of docker-compose.yml will create the guacd service. guacd is the heart of Guacamole which dynamically loads support for remote desktop protocols (called "client plugins") and connects them to remote desktops based on instructions received from the web application. The container will be called `guacd_compose` based on the docker image `guacamole/guacd` connected to our previously created network `guacnetwork_compose`. Additionally we map the 2 local folders `./drive` and `./record` into the container. We can use them later to map user drives and store recordings of sessions.
+The following part of docker-compose.yml will create the guacd service. guacd is the heart of Guacamole which dynamically loads support for remote desktop protocols (called "client plugins") and connects them to remote desktops based on instructions received from the web application. The container will be called `guacd_compose` based on the docker image `guacamole/guacd` connected to our previously created network `guacnetwork_compose`.
 
 ~~~python
 ...
@@ -50,9 +50,6 @@ services:
     networks:
       guacnetwork_compose:
     restart: always
-    volumes:
-    - ./drive:/drive:rw
-    - ./record:/record:rw
 ...
 ~~~
 
@@ -61,20 +58,19 @@ The following part of docker-compose.yml will create an instance of PostgreSQL u
 
 ~~~python
 ...
-  postgres:
-    container_name: postgres_guacamole_compose
+   mariadb:
+    container_name: mariadb
     environment:
-      PGDATA: /var/lib/postgresql/data/guacamole
-      POSTGRES_DB: guacamole_db
-      POSTGRES_PASSWORD: ChooseYourOwnPasswordHere1234
-      POSTGRES_USER: guacamole_user
-    image: postgres
+      MYSQL_ROOT_PASSWORD: 'bagSofMoney'
+      MYSQL_DATABASE: 'guacamole_db'
+      MYSQL_USERNAME: 'guacamole_user'
+      MYSQL_PASSWORD: 'some_password'
+    image: mariadb:10.6
     networks:
-      guacnetwork_compose:
+      - guacnetwork_compose
     restart: always
     volumes:
-    - ./init:/docker-entrypoint-initdb.d:ro
-    - ./data:/var/lib/postgresql/data:rw
+    - "initdb:/docker-entrypoint-initdb.d:ro"
 ...
 ~~~
 
@@ -84,68 +80,45 @@ The following part of docker-compose.yml will create an instance of guacamole by
 ~~~python
 ...
   guacamole:
-    container_name: guacamole_compose
+    container_name: guacamole
+    group_add:
+      - "1000"
     depends_on:
     - guacd
-    - postgres
-    environment:
-      GUACD_HOSTNAME: guacd
-      POSTGRES_DATABASE: guacamole_db
-      POSTGRES_HOSTNAME: postgres
-      POSTGRES_PASSWORD: ChooseYourOwnPasswordHere1234
-      POSTGRES_USER: guacamole_user
-    image: guacamole/guacamole
+    - mariadb
     links:
-    - guacd
+      - guacd
+      - mariadb
+    environment:
+      MYSQL_ENABLED: "true"
+      GUACD_HOSTNAME: guacd
+      MYSQL_HOSTNAME: 'mariadb'
+      MYSQL_DATABASE: 'guacamole_db'
+      MYSQL_USERNAME: 'root' # if you want to use custom user, you will have to create a user in mariadb beforehand.
+      MYSQL_PASSWORD: 'bagSofMoney'
+    image: guacamole/guacamole
     networks:
-      guacnetwork_compose:
+      - guacnetwork_compose
+    volumes:
+      - "initdb:/opt/guacamole/extensions/guacamole-auth-jdbc/mysql/schema:ro"
     ports:
-    - 8080/tcp
+    - 8080:8080/tcp
     restart: always
 ...
 ~~~
 
-#### nginx
-The following part of docker-compose.yml will create an instance of nginx that maps the public port 8443 to the internal port 443. The internal port 443 is then mapped to guacamole using the `./nginx/templates/guacamole.conf.template` file. The container will use the previously generated (`prepare.sh`) self-signed certificate in `./nginx/ssl/` with `./nginx/ssl/self-ssl.key` and `./nginx/ssl/self.cert`.
-
-~~~python
-...
-  # nginx
-  nginx:
-   container_name: nginx_guacamole_compose
-   restart: always
-   image: nginx
-   volumes:
-   - ./nginx/templates:/etc/nginx/templates:ro
-   - ./nginx/ssl/self.cert:/etc/nginx/ssl/self.cert:ro
-   - ./nginx/ssl/self-ssl.key:/etc/nginx/ssl/self-ssl.key:ro
-   ports:
-   - 8443:443
-   links:
-   - guacamole
-   networks:
-     guacnetwork_compose:
-...
-~~~
 
 ## prepare.sh
 `prepare.sh` is a small script that creates `./init/initdb.sql` by downloading the docker image `guacamole/guacamole` and start it like this:
 
 ~~~bash
-docker run --rm guacamole/guacamole /opt/guacamole/bin/initdb.sh --postgresql > ./init/initdb.sql
+docker run --rm guacamole/guacamole /opt/guacamole/bin/initdb.sh --mariadb > ./init/initdb.sql
 ~~~
 
-It creates the necessary database initialization file for postgres.
-
-`prepare.sh` also creates the self-signed certificate `./nginx/ssl/self.cert` and the private key `./nginx/ssl/self-ssl.key` which are used
-by nginx for https.
+It creates the necessary database initialization file for mariadb.
 
 ## reset.sh
 To reset everything to the beginning, just run `./reset.sh`.
-
-## WOL
-
-Wake on LAN (WOL) does not work and I will not fix that because it is beyound the scope of this repo. But [zukkie777](https://github.com/zukkie777) who also filed [this issue](https://github.com/boschkundendienst/guacamole-docker-compose/issues/12) fixed it. You can read about it on the [Guacamole mailing list](http://apache-guacamole-general-user-mailing-list.2363388.n4.nabble.com/How-to-docker-composer-for-WOL-td9164.html)
 
 **Disclaimer**
 

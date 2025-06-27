@@ -38,7 +38,11 @@ services:
       - guacd
       - mariadb
     environment:
-      MYSQL_ENABLED: "true"
+      MYSQL_ENABLED: "true" 
+      TOTP_ENABLED: "true"
+      DUO_ENABLED: "true"
+      RESTRICT_ENABLED: "true"
+      QUICKCONNECT_ENABLED: "true"
       GUACD_HOSTNAME: guacd
       MYSQL_HOSTNAME: 'mariadb'
       MYSQL_DATABASE: 'guacamole_db'

@@ -40,7 +40,7 @@ services:
     environment:
       MYSQL_ENABLED: "true" 
       TOTP_ENABLED: "true"
-      DUO_ENABLED: "true"
+      DUO_ENABLED: "false"
       RESTRICT_ENABLED: "true"
       QUICKCONNECT_ENABLED: "true"
       GUACD_HOSTNAME: guacd
@@ -48,7 +48,7 @@ services:
       MYSQL_DATABASE: 'guacamole_db'
       MYSQL_USERNAME: 'root' # if you want to use custom user, you will have to create a user in mariadb beforehand.
       MYSQL_PASSWORD: 'your_password'
-    image: guacamole/guacamole
+    image: arbaazij/guacamole
     networks:
       - guacnetwork_compose
     volumes:

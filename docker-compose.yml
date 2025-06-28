@@ -48,7 +48,7 @@ services:
       MYSQL_DATABASE: 'guacamole_db'
       MYSQL_USERNAME: 'root' # if you want to use custom user, you will have to create a user in mariadb beforehand.
       MYSQL_PASSWORD: 'your_password'
-    image: arbaazij/guacamole
+    image: arbaazij/guac
     networks:
       - guacnetwork_compose
     volumes:
